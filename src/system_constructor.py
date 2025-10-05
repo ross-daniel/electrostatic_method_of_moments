@@ -25,6 +25,7 @@ class MicroStripSystem(SystemConstructor):
     def __init__(self, domain: MicroStrip, test_fn_type: int = 0, basis_fn_type: int = 0, line_voltages: tuple[float, ...] = None):
         """
         Sets up a system of equations: $[Z][\rho_s] = [V]$ and solves for basis function coefficients of surface charge
+        this system uses a finite ground plane
 
         Parameters
         ----------
@@ -45,9 +46,7 @@ class MicroStripSystem(SystemConstructor):
         else:
             self.line_voltages = line_voltages
         self.num_conductors = len(self.line_voltages)  # currently only 2 conductors are supported but this leaves room for expansion
-
         # ----- First set up Zij -----
-
         # Determine integration function based on test function type
         if self.test_fn_type == 0:
             # Point Matching
@@ -57,25 +56,23 @@ class MicroStripSystem(SystemConstructor):
             self.integral_func = self.galerkin_integral
         else:
             raise ValueError("test_func_type must be 0('point_matching') or 1('galerkin')")
-
         # $Z_{ij} = \int_{\Omega} \int_{\Omega} W_i * g(x, x') dx'$
         # where W_i is the i'th weighting function and g(x, x') is the greens function for the charge induced at a point x' due to the voltage at point x
         # $ \implies Z_{ij} = - \frac{1}{2*\pi*\eps_0} \int_{\Delta l_i} \int_{Delta l_j} ln(r) dl_j dl_i for a pulse basis system
-
         self.Z = self.construct_Z()
-
         # construct the excitation vector 'V'
         # Vi = \int_{\Omega} W_i * V_{12}, V_{12} = V1 if i \in MicroStrip, = V0 if i \in GroundPlane
         self.V = self.construct_V()
-
         # We want V to be in terms of V1 - V0, not one or the other.
         # Thus, we subtract the first row of Z from every other row, and replace the first row with the condition:
         # \int_{\Omega} \rho_s = 0
 
         self.adjust_system()
-
         # Finally, solve the system to find coefficients rho_s
         self.rho = self.solve_system()
+
+        # Calculate C' for error comparisons
+        self.C_prime = self.calculate_c_prime()
 
     def point_matching_integral(self, i, j):
         a = self.domain.discretization.delta_l / 2
@@ -160,13 +157,20 @@ class MicroStripSystem(SystemConstructor):
         # plot charge distribution of MicroStrip on axis 1
         # get an array of the center x vals of the microstrip
         x_vals_strip = [element.x_center for element in self.domain.discretization.elements if element.id < self.domain.N1]
-        ax1.plot(x_vals_strip, self.rho[:self.domain.N1])
+        ax1.plot(x_vals_strip, self.rho[:self.domain.N1], label='strip')
         # plot charge distribution on the ground plane
         x_vals_gnd = [element.x_center for element in self.domain.discretization.elements if element.id >= self.domain.N1]
-        ax2.plot(x_vals_gnd, self.rho[self.domain.N1:])
+        ax2.plot(x_vals_gnd, self.rho[self.domain.N1:], label='gnd plane')
         return ax1, ax2
 
-
+    def calculate_c_prime(self):
+        q_prime = 0
+        for index, r in enumerate(self.rho):
+            if index < self.domain.N1:
+                q_prime += r * self.domain.discretization.delta_l
+            else:
+                break
+        return (q_prime / abs((self.line_voltages[0] - self.line_voltages[1]))) * 10 ** -1
 
 
 class MicrostripInfiniteGndPlaneSystem(SystemConstructor):
@@ -214,12 +218,6 @@ class MicrostripInfiniteGndPlaneSystem(SystemConstructor):
 
     def construct_V_single(self, V):
         return np.zeros((len(self.domain.discretization), 1)) + V
-
-    def construct_V_multiple(self, V1, V2):
-        # TODO: Implement this method
-        # possibly change the domain classes so that the discretization is contained within the
-        # 'Domain' subclasses and we have access to N1 here
-        return self.construct_V_single(V1 - V2)
 
     def construct_Z(self):
         N = len(self.domain.discretization)

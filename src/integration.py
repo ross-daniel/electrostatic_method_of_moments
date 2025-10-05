@@ -19,6 +19,9 @@ def galerkin_integral(a, x1, y1, x2, y2):
     z2pa = complex(x2, y2) + a
 
     def func(z):
+        """
+        This function checks if the log parameter is zero, if so zero is returned since 0^2 * log(0) ~ 0
+        """
         if z == 0:
             return 0
         else:
