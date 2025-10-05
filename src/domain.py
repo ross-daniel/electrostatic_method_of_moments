@@ -5,7 +5,7 @@ import matplotlib.pyplot as plt
 class Domain:
     @property
     @abstractmethod
-    def dimesnions(self) -> int:
+    def dimensions(self) -> int:
         pass
 
     @abstractmethod
@@ -23,10 +23,12 @@ class Element1D:
         self.y_center = y_center
         self.id = id
 
+
 class NonUniformElement1D(Element1D):
-    def __init__(self, x_center: float, y_center: float, id: int,delta_l):
+    def __init__(self, x_center: float, y_center: float, id: int, delta_l):
         super().__init__(x_center, y_center, id)
         self.delta_l = delta_l
+
 
 class UniformDiscretization:
     def __init__(self, delta_l: float, elements: list[Element1D] = None):
@@ -49,8 +51,11 @@ class UniformDiscretization:
             raise TypeError('Not a list of \'Element1D\' objects nor an \'Element1D\' object')
         self.elements = sorted(self.elements, key=lambda element: element.id)
 
-    def __getitem__(self, item):
-        return self.elements[item]
+    def __getitem__(self, index):
+        return self.elements[index]
+
+    def __len__(self):
+        return len(self.elements)
 
     @staticmethod
     def color(_id):
@@ -63,8 +68,8 @@ class UniformDiscretization:
         for element in self.elements:
             x1, y1 = element.x_center - self.delta_l / 2, element.y_center
             x2, y2 = element.x_center + self.delta_l / 2, element.y_center
-            ax.plot([x1, x2], [y1, y2], color=color(element.id), linestyle='--')
-            print(f'Element {element.id}: end1:({x1}, {y1}), end2:({x2}, {y2})')
+            ax.plot([x1, x2], [y1, y2], color='red', linestyle='--')
+            #print(f'Element {element.id}: end1:({x1}, {y1}), end2:({x2}, {y2})')
         return ax
 
 
@@ -74,9 +79,10 @@ class InfiniteMicroStrip(Domain):
         self.h = _height
         self.N = _N
         self.delta_l = _width / self.N
+        self.discretization = self.discretize()
 
     @property
-    def dimesnions(self):
+    def dimensions(self):
         return 2
 
     def get_dimensions(self):
@@ -102,11 +108,6 @@ class InfiniteMicroStrip(Domain):
             x_coord = i * self.delta_l + self.delta_l / 2  # x_coord = index*delta_l + delta_l / 2
             y_coord = 0
             elements.append(Element1D(x_coord, y_coord, i))
-        # microstrip reflection about ground plane
-        for i in range(self.N):
-            x_coord = i * self.delta_l + self.delta_l / 2
-            y_coord = -2 * self.h
-            elements.append(Element1D(x_coord, y_coord, i+self.N))
 
         return UniformDiscretization(delta_l=self.delta_l, elements=elements)
 
@@ -129,6 +130,8 @@ class MicroStrip(Domain):
             self.x_offset_microstrip = (self.w_ground_plane - self.w_strip) / 2
         else:
             self.x_offset_microstrip = _x_offset_microstrip
+
+        self.discretization = self.discretize()
 
     def validate_inputs(self):
         if self.w_ground_plane % self.delta_l != 0:

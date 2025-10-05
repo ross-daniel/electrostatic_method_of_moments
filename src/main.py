@@ -1,25 +1,17 @@
 import domain
+import system_constructor
 import matplotlib.pyplot as plt
 
 
 if __name__ == '__main__':
-    inf_micro_strip = domain.InfiniteMicroStrip(10, 5, 10)
-    inf_micro_strip_discretization = inf_micro_strip.discretize()
+    inf_micro_strip = domain.InfiniteMicroStrip(10, 5, 100)
 
     micro_strip = domain.MicroStrip(10, 5, 20)
-    micro_strip_discretization = micro_strip.discretize()
 
-    def color_microstrip(element_id):
-        if micro_strip_discretization[element_id].y_center == 0:
-        #if element_id < micro_strip.N1:
-            return 'green'
-        else:
-            return 'blue'
+    inf_constructor = system_constructor.PulseBasisSystem(inf_micro_strip, 10, test_func_type='galerkin')
 
-    fig, ax = plt.subplots()
-
-    micro_strip_discretization.plot_discretization(ax, color_microstrip)
-
-    ax.set_aspect("equal", adjustable="box")
-    ax.grid(True, linestyle="--", alpha=0.6)
+    print(f'solution coefs: {inf_constructor.rho}')
+    fig1, ax1 = plt.subplots()
+    inf_constructor.plot_solution(ax1)
     plt.show()
+
