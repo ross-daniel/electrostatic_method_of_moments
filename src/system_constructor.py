@@ -41,7 +41,7 @@ class MicroStripSystem(SystemConstructor):
         self.test_fn_type = test_fn_type
         self.basis_fn_type = basis_fn_type
         if line_voltages is None:
-            self.line_voltages = [0.0, 1.0]
+            self.line_voltages = [0.5, 1.0]
         else:
             self.line_voltages = line_voltages
         self.num_conductors = len(self.line_voltages)  # currently only 2 conductors are supported but this leaves room for expansion
@@ -121,14 +121,23 @@ class MicroStripSystem(SystemConstructor):
         return V
 
     def adjust_system(self):
+
         Z_1 = self.Z[0, :]  # first row of Z matrix
         V1 = self.line_voltages[1]  # first row of V vector
         N = self.domain.discretization.N
+
+        if self.test_fn_type == 0:
+            multiplier = 1
+        elif self.test_fn_type == 1:
+            multiplier = self.domain.discretization.delta_l
+        else:
+            raise NotImplementedError('test_fn_type must be 0(point_matching) or 1(galerkin)')
+
         for i in range(N):
             if i == 0:
                 continue
             else:
-                self.V[i] -= V1
+                self.V[i] -= V1 * multiplier
                 for j in range(N):
                     self.Z[i, j] -= Z_1[j]
         # Now set the first row

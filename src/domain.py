@@ -183,7 +183,7 @@ class MicroStrip(Domain):
         self.discretization = self.discretize()
 
     def validate_inputs(self):
-        if self.w_ground_plane % self.delta_l != 0:
+        if int(self.w_ground_plane % self.delta_l) != 0:
             raise ValueError('Ground plane must be divisible by delta_l = (w_strip / N1)')
         else:
             return int(self.w_ground_plane / self.delta_l)

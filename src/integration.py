@@ -32,8 +32,8 @@ def galerkin_integral(a, x1, y1, x2, y2):
         raise ValueError('points cannot be identical')
     else:
         d_hat = d / norm_d
-    #l_hat = complex(d_hat[0], d_hat[1])
-    l_hat = (z2 - z1) / abs(z2 - z1)
+    l_hat = complex(d_hat[0], d_hat[1])
+    #l_hat = (z2 - z1) / abs(z2 - z1)
 
     term1 = func(z2ma)
     term2 = func(z2pa)
