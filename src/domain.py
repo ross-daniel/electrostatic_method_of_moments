@@ -1,20 +1,7 @@
 from abc import ABC, abstractmethod
 import matplotlib.pyplot as plt
+#from typing import Protocol, Tuple
 # Create and discretize a geometric domain
-
-class Domain:
-    @property
-    @abstractmethod
-    def dimensions(self) -> int:
-        pass
-
-    @abstractmethod
-    def get_dimensions(self):
-        pass
-
-    @abstractmethod
-    def discretize(self):
-        pass
 
 
 class Element1D:
@@ -24,19 +11,56 @@ class Element1D:
         self.id = id
 
 
+class Discretization(ABC):
+    @property
+    @abstractmethod
+    def elements(self) -> list[Element1D]:
+        pass
+
+    @property
+    @abstractmethod
+    def N(self) -> int:
+        pass
+
+    @property
+    @abstractmethod
+    def delta_l(self) -> float:
+        pass
+
+    @abstractmethod
+    def __getitem__(self, item: int) -> Element1D:
+        pass
+
+
+class Domain(ABC):
+    @property
+    @abstractmethod
+    def geometric_dimensions(self) -> int:
+        pass
+
+    @property
+    @abstractmethod
+    def discretization(self) -> Discretization:
+        pass
+
+    @abstractmethod
+    def discretize(self):
+        pass
+
+
 class NonUniformElement1D(Element1D):
     def __init__(self, x_center: float, y_center: float, id: int, delta_l):
         super().__init__(x_center, y_center, id)
         self.delta_l = delta_l
 
 
-class UniformDiscretization:
+class UniformDiscretization(Discretization):
     def __init__(self, delta_l: float, elements: list[Element1D] = None):
         if elements is None:
-            self.elements = []
+            self._elements = []
         else:
-            self.elements = sorted(elements, key=lambda element: element.id)
-        self.delta_l = delta_l
+            self._elements: list[Element1D] = sorted(elements, key=lambda element: element.id)
+        self._delta_l = delta_l
 
     def __add__(self, other):
         if isinstance(other, tuple) and len(other) == 2 and isinstance(other[0], float) and isinstance(other[1], float):
@@ -50,6 +74,26 @@ class UniformDiscretization:
         else:
             raise TypeError('Not a list of \'Element1D\' objects nor an \'Element1D\' object')
         self.elements = sorted(self.elements, key=lambda element: element.id)
+
+    @property
+    def elements(self) -> list[Element1D]:
+        return self._elements
+
+    @elements.setter
+    def elements(self, elements: list[Element1D]):
+        self._elements = elements
+
+    @property
+    def delta_l(self) -> float:
+        return self._delta_l
+
+    @delta_l.setter
+    def delta_l(self, delta_l: float):
+        self._delta_l = delta_l
+
+    @property
+    def N(self) -> int:
+        return len(self.elements)
 
     def __getitem__(self, index):
         return self.elements[index]
@@ -69,7 +113,6 @@ class UniformDiscretization:
             x1, y1 = element.x_center - self.delta_l / 2, element.y_center
             x2, y2 = element.x_center + self.delta_l / 2, element.y_center
             ax.plot([x1, x2], [y1, y2], color='red', linestyle='--')
-            #print(f'Element {element.id}: end1:({x1}, {y1}), end2:({x2}, {y2})')
         return ax
 
 
@@ -79,14 +122,19 @@ class InfiniteMicroStrip(Domain):
         self.h = _height
         self.N = _N
         self.delta_l = _width / self.N
-        self.discretization = self.discretize()
+        self._discretization = self.discretize()
 
     @property
-    def dimensions(self):
-        return 2
+    def geometric_dimensions(self):
+        return 1
 
-    def get_dimensions(self):
-        return (self.w, self.h)
+    @property
+    def discretization(self) -> Discretization:
+        return self._discretization
+
+    @discretization.setter
+    def discretization(self, discretization: Discretization):
+        self._discretization = discretization
 
     def discretize(self):
         """
@@ -110,6 +158,7 @@ class InfiniteMicroStrip(Domain):
             elements.append(Element1D(x_coord, y_coord, i))
 
         return UniformDiscretization(delta_l=self.delta_l, elements=elements)
+
 
 class MicroStrip(Domain):
     def __init__(self, _w_strip: float, _h_strip: float, _w_ground_plane: float, N1_: int = 10, _x_offset_microstrip: float = None):
@@ -140,12 +189,16 @@ class MicroStrip(Domain):
             return int(self.w_ground_plane / self.delta_l)
 
     @property
-    def dimensions(self):
-        return 4
+    def geometric_dimensions(self):
+        return 1
 
-    def get_dimensions(self):
-        return (self.w_strip, self.h_strip, self.w_ground_plane, self.x_offset_microstrip)
+    @property
+    def discretization(self) -> Discretization:
+        return self._discretization
 
+    @discretization.setter
+    def discretization(self, d: Discretization):
+        self._discretization = d
 
     def discretize(self):
         """
@@ -165,14 +218,14 @@ class MicroStrip(Domain):
         for i in range(self.N):
             if i < self.N1:
                 # element is part of the microstrip
-                y_center = self.h_strip # y_coord is on the strip of height h
-                x_center = i * self.delta_l + self.delta_l / 2 + self.x_offset_microstrip # x coord is index * delta_l + delta_l / 2 + x_offset of microstrip
+                y_center = self.h_strip  # y_coord is on the strip of height h
+                x_center = i * self.delta_l + self.delta_l / 2 + self.x_offset_microstrip  # x coord is index * delta_l + delta_l / 2 + x_offset of microstrip
                 new_element = Element1D(x_center, y_center, i)
                 elements.append(new_element)
             else:
                 # element is part of ground plane
                 y_center = 0  # y_coord is 0
-                x_center = (i - self.N1) * self.delta_l + self.delta_l / 2  # x_coord is index of ground plane elements * delta_l + delta_l / 2
+                x_center = (i - self.N1) * self.delta_l + self.delta_l / 2   # x_coord is index of ground plane elements * delta_l + delta_l / 2
                 new_element = Element1D(x_center, y_center, i)
                 elements.append(new_element)
         return UniformDiscretization(delta_l=self.delta_l, elements=elements)
